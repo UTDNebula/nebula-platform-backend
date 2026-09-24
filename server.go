@@ -15,14 +15,15 @@ func main() {
 	// Enable CORS
 	router.Use(CORS)
 
+	// Enable Logging
+	router.Use(LogRequest)
+
+	// Health endpoint
 	router.GET("/health", func(context *gin.Context) {
 		context.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// Enable Logging
-	router.Use(LogRequest)
-
-	// Connect routes
+	// Connect routes here
 
 	// Get the port
 	port := os.Getenv("PORT")
