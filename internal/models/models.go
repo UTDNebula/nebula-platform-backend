@@ -9,6 +9,7 @@ import (
 type User struct {
 	Id        bson.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
 	Email     string        `json:"email" bson:"email" validate:"required,email"`
+	Github    *string       `json:"github" bson:"github"`
 	CreatedAt time.Time     `json:"created_at" bson:"created_at"`
 }
 
@@ -20,7 +21,6 @@ type APIKey struct {
 	HashedKey    string        `bson:"hashed_key" json:"-"`
 	EncryptedKey string        `bson:"encrypted_key,omitempty" json:"-"`
 	Internal     bool          `bson:"internal" json:"internal"`
-	Active       bool          `bson:"active" json:"active"`
 	CreatedAt    time.Time     `bson:"created_at" json:"created_at"`
 	RevokedAt    *time.Time    `bson:"revoked_at,omitempty" json:"revoked_at,omitempty"`
 }
