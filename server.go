@@ -3,55 +3,59 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
+	"regexp"
+	"time"
 
+	"github.com/UTDNebula/nebula-platform-backend/internal/config"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery())
+	// Set up third party clients here
+	if _, err := config.ConnectMongo(); err != nil {
+		log.Fatalf("Server startup failed: %v", err)
+	}
+
+	router := gin.Default()
 
 	// Enable CORS
-	router.Use(CORS)
-
-	// Enable Logging
-	router.Use(LogRequest)
+	router.Use(cors.New(cors.Config{
+		AllowOriginFunc:  isOriginAllowed,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "sentry-trace", "baggage"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           6 * time.Hour,
+	}))
 
 	// Health endpoint
-	router.GET("/health", func(context *gin.Context) {
-		context.JSON(http.StatusOK, gin.H{"status": "ok"})
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	// Connect routes here
 
-	// Get the port
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	log.Printf("starting server on :%s", port)
+	// Run the router
+	port := config.GetPortString()
+	log.Printf("Starting server on %s", port)
 
-	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("server stopped: %v", err)
+	if err := router.Run(port); err != nil {
+		log.Fatalf("Server startup failed: %v", err)
 	}
 }
 
-func CORS(c *gin.Context) {
-	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-	c.Writer.Header().Set("Access-Control-Allow-Headers", "Accept, x-api-key, Origin, Content-type, Authorization, sentry-trace, baggage")
-	c.Writer.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET")
-
-	if c.Request.Method == "OPTIONS" {
-		c.IndentedJSON(204, "")
-		return
+// Allows only certain origins since this is a specific backend server
+// instead of public api
+func isOriginAllowed(origin string) bool {
+	if gin.Mode() == gin.DebugMode {
+		// Allows "*" if this is in development
+		return true
 	}
 
-	c.Next()
-}
+	// Deployment Vercel URL
+	pattern := `^https?://nebula-platform(?:-[a-zA-Z0-9-]+)?\.vercel\.app/?$`
+	regex := regexp.MustCompile(pattern)
 
-func LogRequest(c *gin.Context) {
-	log.Printf("%s %s %s", c.Request.Method, c.Request.URL.Path, c.Request.Host)
-	c.Next()
+	return origin == "http://localhost:3000" || regex.MatchString(origin)
 }
