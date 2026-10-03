@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"regexp"
@@ -12,31 +13,50 @@ import (
 )
 
 func main() {
-	// Set up third party clients here
-	if _, err := config.ConnectMongo(); err != nil {
-		log.Fatalf("Server startup failed: %v", err)
+	db, err := config.ConnectPostgres()
+	if err != nil {
+		log.Fatalf("connect to PostgreSQL: %v", err)
 	}
+	defer db.Close()
+
+	log.Println("Connected to PostgreSQL")
 
 	router := gin.Default()
 
 	// Enable CORS
 	router.Use(cors.New(cors.Config{
 		AllowOriginFunc:  isOriginAllowed,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "sentry-trace", "baggage"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           6 * time.Hour,
 	}))
 
-	// Health endpoint
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+		})
 	})
 
-	// Connect routes here
+	// Test the database connection
+	router.GET("/ready", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
 
-	// Run the router
+		if err := db.Ping(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unavailable",
+				"error":  "database is unavailable",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ready",
+		})
+	})
+
 	port := config.GetPortString()
 	log.Printf("Starting server on %s", port)
 

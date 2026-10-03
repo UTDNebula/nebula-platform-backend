@@ -20,31 +20,30 @@ func init() {
 		envPath := filepath.Join(dir, ".env")
 		if _, err := os.Stat(envPath); err == nil {
 			_ = godotenv.Load(envPath)
-			break
+			return
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			break
+			return
 		}
 		dir = parent
 	}
 }
 
 func GetPortString() string {
-	portNumber, exist := os.LookupEnv("PORT")
-	if !exist || strings.TrimSpace(portNumber) == "" {
-		portNumber = "8081"
+	port := strings.TrimSpace(os.Getenv("PORT"))
+	if port == "" {
+		port = "8081"
 	}
 
-	port := fmt.Sprintf(":%s", portNumber)
-	return port
+	return fmt.Sprintf(":%s", port)
 }
 
-func GetEnvMongoURI() (string, error) {
-	uri, exist := os.LookupEnv("MONGODB_URI")
-	if !exist {
-		return "", fmt.Errorf("Error loading 'MONGODB_URI' from the .env file")
+func GetDatabaseURL() (string, error) {
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		return "", fmt.Errorf("DATABASE_URL is required")
 	}
 
-	return uri, nil
+	return databaseURL, nil
 }

@@ -1,18 +1,13 @@
-# Basic justfile
+set dotenv-load := true
+
 default:
     @just --list --unsorted
 
 run:
-    go run server.go
+    go run .
 
 build:
-    go build -o server server.go
-
-image:
-    docker build -t nebula-platform-backend:latest .
-
-container: image
-    docker run --rm --name nebula-platform-backend -p 8081:8081 --env-file .env nebula-platform-backend:latest
+    go build -o server .
 
 test:
     go test -v ./...
@@ -20,3 +15,29 @@ test:
 tidy:
     go mod tidy
 
+db-up:
+    docker compose up -d postgres
+
+db-down:
+    docker compose down
+
+db-status:
+    docker compose ps
+
+db-logs:
+    docker compose logs -f postgres
+
+db-shell:
+    docker compose exec postgres psql -U nebula -d nebula_platform
+
+migration name:
+    GOOSE_DRIVER=postgres GOOSE_DBSTRING="$DATABASE_URL" GOOSE_MIGRATION_DIR=migrations goose create "{{name}}" sql
+
+migrate-up:
+    GOOSE_DRIVER=postgres GOOSE_DBSTRING="$DATABASE_URL" GOOSE_MIGRATION_DIR=migrations goose up
+
+migrate-down:
+    GOOSE_DRIVER=postgres GOOSE_DBSTRING="$DATABASE_URL" GOOSE_MIGRATION_DIR=migrations goose down
+
+migrate-status:
+    GOOSE_DRIVER=postgres GOOSE_DBSTRING="$DATABASE_URL" GOOSE_MIGRATION_DIR=migrations goose status
