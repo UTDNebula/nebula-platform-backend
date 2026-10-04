@@ -1,25 +1,42 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/UTDNebula/nebula-platform-backend/internal/config"
+	"github.com/UTDNebula/nebula-platform-backend/internal/controllers"
+	"github.com/UTDNebula/nebula-platform-backend/internal/routes"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	db, err := config.ConnectPostgres()
+	db, err := config.NewPostgresPool()
 	if err != nil {
-		log.Fatalf("connect to PostgreSQL: %v", err)
+		log.Fatalf("Connect to PostgreSQL: %v", err)
 	}
 	defer db.Close()
-
 	log.Println("Connected to PostgreSQL")
+
+	googleSettings, err := config.NewGoogleSettings()
+	if err != nil {
+		log.Fatalf("Connect to Google OIDC: %v", err)
+	}
+
+	google, err := config.NewOIDCClient(*googleSettings)
+	if err != nil {
+		log.Fatalf("Connect to Google OIDC: %v", err)
+	}
+
+	sessionManager, err := config.NewSessionManager(db)
+	if err != nil {
+		log.Fatalf("Initialize session manager: %v", err)
+	}
+
+	authController := controllers.NewAuthController(google, sessionManager)
 
 	router := gin.Default()
 
@@ -39,28 +56,15 @@ func main() {
 		})
 	})
 
-	// Test the database connection
-	router.GET("/ready", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-		defer cancel()
-
-		if err := db.Ping(ctx); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status": "unavailable",
-				"error":  "database is unavailable",
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ready",
-		})
-	})
+	// Register the routes
+	routes.RegisterAuth(router, authController)
 
 	port := config.GetPortString()
 	log.Printf("Starting server on %s", port)
 
-	if err := router.Run(port); err != nil {
+	// Run the server with the session manager wrapping around the router
+	err = http.ListenAndServe(port, sessionManager.LoadAndSave(router))
+	if err != nil {
 		log.Fatalf("Server startup failed: %v", err)
 	}
 }
