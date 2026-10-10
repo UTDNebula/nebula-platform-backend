@@ -49,7 +49,7 @@ func (a *AuthController) Login(c *gin.Context) {
 	// state verifies if callback ties to this login
 	state, err := generateToken()
 	if err != nil {
-		respondInternalError(c, fmt.Errorf("Unable to create state: %w", err))
+		redirectError(c, fmt.Errorf("Unable to create state: %w", err))
 		return
 	}
 
@@ -59,7 +59,7 @@ func (a *AuthController) Login(c *gin.Context) {
 	// nonce verifies ID token
 	nonce, err := generateToken()
 	if err != nil {
-		respondInternalError(c, fmt.Errorf("Unable to create nonce: %w", err))
+		redirectError(c, fmt.Errorf("Unable to create nonce: %w", err))
 		return
 	}
 
@@ -74,11 +74,11 @@ func (a *AuthController) Login(c *gin.Context) {
 		state,
 		oauth2.S256ChallengeOption(pckeVerifier),
 		oidc.Nonce(nonce),
-		oauth2.SetAuthURLParam("prompt", "select_account"),
+		oauth2.SetAuthURLParam("prompt", "select_account"), // Always show account
 	)
 
 	// The browser redirects to Google's login page
-	c.Redirect(http.StatusFound, loginURL)
+	redirect(c, http.StatusFound, loginURL)
 }
 
 type googleClaims struct {
@@ -94,72 +94,72 @@ func (a *AuthController) Callback(c *gin.Context) {
 
 	// Error from callback URL if any
 	if oauthErr := c.Query("error"); oauthErr != "" {
-		respond(c, http.StatusBadRequest, "error", oauthErr)
+		redirectError(c, errors.New(oauthErr))
 		return
 	}
 
 	// Verify that the callback is tied to this login attempt
 	state := a.manager.PopString(ctx, "state")
 	callbackState := c.Query("state")
-	if state == "" || callbackState == "" || state != callbackState {
-		respond(c, http.StatusBadRequest, "error", errors.New("invalid state"))
+	if !equal(state, callbackState) {
+		redirectError(c, fmt.Errorf("invalid state. state=%s & callbackState=%s", state, callbackState))
 		return
 	}
 
 	// Exchange code for id tokens
 	pkceVerifier := a.manager.PopString(ctx, "pkce_verifier")
 	if pkceVerifier == "" {
-		respond(c, http.StatusBadRequest, "error", errors.New("missing pcke"))
+		redirectError(c, errors.New("missing pcke"))
 		return
 	}
 	code := c.Query("code")
 	if code == "" {
-		respond(c, http.StatusBadRequest, "error", errors.New("missing authorization code"))
+		redirectError(c, errors.New("missing authz code"))
 		return
 	}
 	idToken, err := a.exchangeCodeForIdToken(ctx, code, pkceVerifier)
 	if err != nil {
-		respondInternalError(c, err)
+		redirectError(c, fmt.Errorf("unable to exchange code for token: %w", err))
 		return
 	}
 
 	// Validate the id token
 	nonce := a.manager.PopString(ctx, "nonce")
-	if nonce == "" || idToken.Nonce == "" || nonce != idToken.Nonce {
-		respond(c, http.StatusBadRequest, "error", errors.New("invalid nonce"))
+	if !equal(nonce, idToken.Nonce) {
+		redirectError(c, fmt.Errorf("invalid nonce. nonce=%s & idtoken nonce=%s", nonce, idToken.Nonce))
 		return
 	}
 	if idToken.Subject == "" {
-		respondInternalError(c, errors.New("id token has no subject"))
+		redirectError(c, errors.New("id token has no subject"))
 		return
 	}
 
 	// Unmarshal claims from id token and validate claims
 	var claims googleClaims
 	if err = idToken.Claims(&claims); err != nil {
-		respondInternalError(c, err)
+		redirectError(c, fmt.Errorf("unable to parse claims: %w", err))
 		return
 	}
 	if !claims.EmailVerified || strings.TrimSpace(claims.Email) == "" {
-		respondInternalError(c, errors.New("email is not verified"))
+		redirectError(c, errors.New("email is not verified or non-existent"))
 		return
 	}
 
 	// Create a user or find it
 	userId, err := a.findOrInsertUser(ctx, *idToken, claims)
 	if err != nil {
-		respondInternalError(c, fmt.Errorf("unable to find or create user: %w", err))
+		redirectError(c, fmt.Errorf("unable to find or create user: %w", err))
 		return
 	}
 
 	// Renew the token and data in session and cookie
 	if err = a.manager.RenewToken(ctx); err != nil {
-		respondInternalError(c, err)
+		redirectError(c, err)
 		return
 	}
 	a.manager.Put(ctx, "user_id", userId.String())
 
-	c.Redirect(http.StatusSeeOther, "http://localhost:3000/dashboard")
+	redirect(c, http.StatusSeeOther, "http://localhost:3000/dashboard")
 }
 
 // exchangeCodeForIdToken exchanges authorization code for the Id token
@@ -179,7 +179,7 @@ func (a *AuthController) exchangeCodeForIdToken(
 
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, fmt.Errorf("Unable to access id token")
+		return nil, fmt.Errorf("unable to access id token from oauth2 token")
 	}
 
 	idToken, err := a.googleClient.Verifier.Verify(ctx, rawIDToken)
@@ -190,8 +190,8 @@ func (a *AuthController) exchangeCodeForIdToken(
 	return idToken, nil
 }
 
-// findOrInsertUser queries the user from database, it it doesn't exist then it
-// will create the user in the database on signup
+// findOrInsertUser queries the user from database,
+// if it doesn't exist then it will create the user in the database on signup
 func (a *AuthController) findOrInsertUser(
 	ctx context.Context,
 	idToken oidc.IDToken,
@@ -204,7 +204,6 @@ func (a *AuthController) findOrInsertUser(
 		idToken.Issuer, idToken.Subject,
 	).Scan(&userId); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Insert the new user and user_identity in 1 query to avoid too many round trip
 			insertedUserIdRow := a.db.QueryRow(
 				ctx,
 				`with inserted_user as (
@@ -237,18 +236,16 @@ func (a *AuthController) findOrInsertUser(
 	return userId, nil
 }
 
-// Wrapper for logout
-// Dummy implemenration, not working on this before testing login and callback
 func (a *AuthController) Logout(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	// Remove the session in the database
 	if err := a.manager.Destroy(ctx); err != nil {
-		respondInternalError(c, err)
+		redirectError(c, err)
 		return
 	}
 	a.manager.PopString(ctx, "user_id")
 
-	c.Redirect(http.StatusSeeOther, "http://localhost:3000/login")
+	redirect(c, http.StatusSeeOther, "http://localhost:3000")
 }

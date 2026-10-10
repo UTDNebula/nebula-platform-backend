@@ -15,8 +15,7 @@ CREATE TABLE user_identities (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT user_identities_issuer_subject_unique
-        UNIQUE (issuer, subject)
+    CONSTRAINT user_identities_issuer_subject_unique UNIQUE (issuer, subject)
 );
 
 CREATE INDEX user_identities_user_id_idx
