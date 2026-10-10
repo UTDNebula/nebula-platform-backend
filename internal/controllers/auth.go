@@ -42,7 +42,7 @@ func NewAuthController(
 	}
 }
 
-func (a *AuthController) Login(c *gin.Context) {
+func (a *AuthController) GoogleLogin(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
@@ -88,7 +88,7 @@ type googleClaims struct {
 	EmailVerified bool   `json:"email_verified"`
 }
 
-func (a *AuthController) Callback(c *gin.Context) {
+func (a *AuthController) GoogleCallback(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
@@ -236,7 +236,7 @@ func (a *AuthController) findOrInsertUser(
 	return userId, nil
 }
 
-func (a *AuthController) Logout(c *gin.Context) {
+func (a *AuthController) GoogleLogout(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
