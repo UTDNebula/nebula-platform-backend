@@ -41,7 +41,7 @@ func NewGoogleSettings() (*OIDCSettings, error) {
 	}
 
 	s.RedirectURL = strings.TrimSpace(os.Getenv("GOOGLE_REDIRECT_URL"))
-	if s.ClientSecret == "" {
+	if s.RedirectURL == "" {
 		return nil, fmt.Errorf("Missing GOOGLE_REDIRECT_URL")
 	}
 
@@ -55,7 +55,6 @@ func NewGithubSettings() (*OIDCSettings, error) {
 
 type OIDCClient struct {
 	OAuthConfig *oauth2.Config
-
 	// The verifier ensures that an ID token was issued specifically for our application.
 	Verifier *oidc.IDTokenVerifier
 }
@@ -79,8 +78,7 @@ func NewOIDCClient(s OIDCSettings) (*OIDCClient, error) {
 
 		// These endpoints were discovered from the issuer.
 		Endpoint: provider.Endpoint(),
-
-		Scopes: s.Scopes,
+		Scopes:   s.Scopes,
 	}
 
 	verifier := provider.Verifier(&oidc.Config{
@@ -100,7 +98,7 @@ func NewSessionManager(database *pgxpool.Pool) (*scs.SessionManager, error) {
 	manager.Store = pgxstore.New(database)
 
 	manager.Lifetime = 1 * time.Hour
-	manager.IdleTimeout = 15 * time.Minute
+	manager.IdleTimeout = 30 * time.Minute
 	manager.HashTokenInStore = true
 
 	manager.Cookie.Name = "nebula_session"

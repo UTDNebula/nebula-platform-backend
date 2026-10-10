@@ -9,8 +9,7 @@ CREATE TABLE users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX users_email_unique
-    ON users (LOWER(email));
+CREATE UNIQUE INDEX users_email_unique ON users (LOWER(email));
 
 CREATE TABLE api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,8 +23,7 @@ CREATE TABLE api_keys (
     revoked_at TIMESTAMPTZ
 );
 
-CREATE INDEX api_keys_user_id_idx
-    ON api_keys (user_id);
+CREATE INDEX api_keys_user_id_idx ON api_keys (user_id);
 
 CREATE INDEX api_keys_active_user_id_idx
     ON api_keys (user_id)

@@ -36,7 +36,8 @@ func main() {
 		log.Fatalf("Initialize session manager: %v", err)
 	}
 
-	authController := controllers.NewAuthController(google, sessionManager)
+	authController := controllers.NewAuthController(google, sessionManager, db)
+	userController := controllers.NewUserController(db)
 
 	router := gin.Default()
 
@@ -58,12 +59,13 @@ func main() {
 
 	// Register the routes
 	routes.RegisterAuth(router, authController)
+	routes.RegisterUser(router, userController, sessionManager)
 
-	port := config.GetPortString()
-	log.Printf("Starting server on %s", port)
+	portString := config.GetPortString()
+	log.Printf("Starting server on %s", portString)
 
 	// Run the server with the session manager wrapping around the router
-	err = http.ListenAndServe(port, sessionManager.LoadAndSave(router))
+	err = http.ListenAndServe(portString, sessionManager.LoadAndSave(router))
 	if err != nil {
 		log.Fatalf("Server startup failed: %v", err)
 	}
