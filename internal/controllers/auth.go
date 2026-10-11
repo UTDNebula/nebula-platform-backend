@@ -24,9 +24,9 @@ const (
 )
 
 type AuthController struct {
-	googleClient *config.OIDCClient
-	manager      *scs.SessionManager
-	db           *pgxpool.Pool
+	GoogleClient *config.OIDCClient
+	Manager      *scs.SessionManager
+	DB           *pgxpool.Pool
 }
 
 // Initialize the auth controllers with OIDC client and session manager
@@ -36,9 +36,9 @@ func NewAuthController(
 	db *pgxpool.Pool,
 ) *AuthController {
 	return &AuthController{
-		googleClient: googleClient,
-		manager:      sessionManager,
-		db:           db,
+		GoogleClient: googleClient,
+		Manager:      sessionManager,
+		DB:           db,
 	}
 }
 
@@ -65,12 +65,12 @@ func (a *AuthController) GoogleLogin(c *gin.Context) {
 
 	// Session manager injects these secrets to request's context
 	// When the request completes, scs will save the session to database
-	a.manager.Put(ctx, "state", state)
-	a.manager.Put(ctx, "pkce_verifier", pckeVerifier)
-	a.manager.Put(ctx, "nonce", nonce)
+	a.Manager.Put(ctx, "state", state)
+	a.Manager.Put(ctx, "pkce_verifier", pckeVerifier)
+	a.Manager.Put(ctx, "nonce", nonce)
 
 	// Build the URL to Google's login page
-	loginURL := a.googleClient.OAuthConfig.AuthCodeURL(
+	loginURL := a.GoogleClient.OAuthConfig.AuthCodeURL(
 		state,
 		oauth2.S256ChallengeOption(pckeVerifier),
 		oidc.Nonce(nonce),
@@ -99,15 +99,15 @@ func (a *AuthController) GoogleCallback(c *gin.Context) {
 	}
 
 	// Verify that the callback is tied to this login attempt
-	state := a.manager.PopString(ctx, "state")
+	state := a.Manager.PopString(ctx, "state")
 	callbackState := c.Query("state")
 	if !equal(state, callbackState) {
 		redirectError(c, fmt.Errorf("invalid state. state=%s & callbackState=%s", state, callbackState))
 		return
 	}
 
-	// Exchange code for id tokens
-	pkceVerifier := a.manager.PopString(ctx, "pkce_verifier")
+	// Exchange code for id token
+	pkceVerifier := a.Manager.PopString(ctx, "pkce_verifier")
 	if pkceVerifier == "" {
 		redirectError(c, errors.New("missing pcke"))
 		return
@@ -124,7 +124,7 @@ func (a *AuthController) GoogleCallback(c *gin.Context) {
 	}
 
 	// Validate the id token
-	nonce := a.manager.PopString(ctx, "nonce")
+	nonce := a.Manager.PopString(ctx, "nonce")
 	if !equal(nonce, idToken.Nonce) {
 		redirectError(c, fmt.Errorf("invalid nonce. nonce=%s & idtoken nonce=%s", nonce, idToken.Nonce))
 		return
@@ -153,11 +153,11 @@ func (a *AuthController) GoogleCallback(c *gin.Context) {
 	}
 
 	// Renew the token and data in session and cookie
-	if err = a.manager.RenewToken(ctx); err != nil {
+	if err = a.Manager.RenewToken(ctx); err != nil {
 		redirectError(c, err)
 		return
 	}
-	a.manager.Put(ctx, "user_id", userId.String())
+	a.Manager.Put(ctx, "user_id", userId.String())
 
 	redirect(c, http.StatusSeeOther, "http://localhost:3000/dashboard")
 }
@@ -168,7 +168,7 @@ func (a *AuthController) exchangeCodeForIdToken(
 	authzCode string,
 	pkceVerifier string,
 ) (*oidc.IDToken, error) {
-	oauth2Token, err := a.googleClient.OAuthConfig.Exchange(
+	oauth2Token, err := a.GoogleClient.OAuthConfig.Exchange(
 		ctx,
 		authzCode,
 		oauth2.VerifierOption(pkceVerifier),
@@ -182,7 +182,7 @@ func (a *AuthController) exchangeCodeForIdToken(
 		return nil, fmt.Errorf("unable to access id token from oauth2 token")
 	}
 
-	idToken, err := a.googleClient.Verifier.Verify(ctx, rawIDToken)
+	idToken, err := a.GoogleClient.Verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		return nil, err
 	}
@@ -198,17 +198,17 @@ func (a *AuthController) findOrInsertUser(
 	claims googleClaims,
 ) (uuid.UUID, error) {
 	var userId uuid.UUID
-	if err := a.db.QueryRow(
+	if err := a.DB.QueryRow(
 		ctx,
 		"select user_id from user_identities where issuer = $1 and subject = $2;",
 		idToken.Issuer, idToken.Subject,
 	).Scan(&userId); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			insertedUserIdRow := a.db.QueryRow(
+			insertedUserIdRow := a.DB.QueryRow(
 				ctx,
 				`with inserted_user as (
-					insert into users (email, display_name, avatar_url)
-					values ($1, $2, $3)
+					insert into users (email, display_name, avatar_url, role)
+					values ($1, $2, $3, 'user')
 					returning id
 				)
 				insert into user_identities (
@@ -241,11 +241,11 @@ func (a *AuthController) GoogleLogout(c *gin.Context) {
 	defer cancel()
 
 	// Remove the session in the database
-	if err := a.manager.Destroy(ctx); err != nil {
+	if err := a.Manager.Destroy(ctx); err != nil {
 		redirectError(c, err)
 		return
 	}
-	a.manager.PopString(ctx, "user_id")
+	a.Manager.PopString(ctx, "user_id")
 
 	redirect(c, http.StatusSeeOther, "http://localhost:3000")
 }

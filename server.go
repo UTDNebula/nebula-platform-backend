@@ -64,8 +64,11 @@ func main() {
 	portString := config.GetPortString()
 	log.Printf("Starting server on %s", portString)
 
-	// Run the server with the session manager wrapping around the router
-	err = http.ListenAndServe(portString, sessionManager.LoadAndSave(router))
+	// Run the server
+	err = http.ListenAndServe(
+		portString,
+		sessionManager.LoadAndSave(router),
+	)
 	if err != nil {
 		log.Fatalf("Server startup failed: %v", err)
 	}

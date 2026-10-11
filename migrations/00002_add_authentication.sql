@@ -18,8 +18,7 @@ CREATE TABLE user_identities (
     CONSTRAINT user_identities_issuer_subject_unique UNIQUE (issuer, subject)
 );
 
-CREATE INDEX user_identities_user_id_idx
-    ON user_identities (user_id);
+CREATE INDEX user_identities_user_id_idx ON user_identities (user_id);
 
 CREATE TABLE sessions (
     token TEXT PRIMARY KEY,
@@ -27,8 +26,7 @@ CREATE TABLE sessions (
     expiry TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX sessions_expiry_idx
-    ON sessions (expiry);
+CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 
 -- +goose Down

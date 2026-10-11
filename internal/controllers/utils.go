@@ -16,7 +16,7 @@ type APIResponse[T any] struct {
 	Data    T
 }
 
-func respond[T any](c *gin.Context, status int, message string, data T) {
+func Respond[T any](c *gin.Context, status int, message string, data T) {
 	c.JSON(
 		status,
 		APIResponse[T]{
@@ -26,10 +26,10 @@ func respond[T any](c *gin.Context, status int, message string, data T) {
 	)
 }
 
-func respondInternalError(c *gin.Context, err error) {
+func RespondInternalError(c *gin.Context, err error) {
 	// TODO: Log these in Sentry
 	log.Output(2, fmt.Sprintf("INTERNAL SERVER ERROR: %s", err.Error()))
-	respond(c, http.StatusInternalServerError, "error", err.Error())
+	Respond(c, http.StatusInternalServerError, "error", err.Error())
 }
 
 func redirect(c *gin.Context, status int, url string) {

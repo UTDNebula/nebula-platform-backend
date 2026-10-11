@@ -6,9 +6,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterUser(router *gin.Engine, controller *controllers.UserController, manager *scs.SessionManager) {
+func RegisterUser(
+	router *gin.Engine,
+	controller *controllers.UserController,
+	manager *scs.SessionManager,
+) {
 	userGroup := router.Group("/api/users")
 	userGroup.Use(authMiddleware(manager))
+	{
+		userGroup.GET("/profile", controller.Profile)
+	}
 
-	userGroup.GET("/profile", controller.Profile)
+	adminUserGroup := router.Group("/api/admin/users")
+	adminUserGroup.Use(adminMiddleware(manager, controller.DB))
+	{
+		adminUserGroup.GET("/", controller.ListUsers)
+	}
 }
