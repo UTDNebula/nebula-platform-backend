@@ -2,4 +2,5 @@
 
 server
 
-test-frontend
+test-frontend/dist
+test-frontend/node_modules
