@@ -11,6 +11,7 @@ import (
 	"github.com/UTDNebula/nebula-platform-backend/internal/routes"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
 )
 
 func main() {
@@ -26,9 +27,20 @@ func main() {
 		log.Fatalf("Connect to Google OIDC: %v", err)
 	}
 
-	google, err := config.NewOIDCClient(*googleSettings)
+	googleProvider, err := config.NewOIDCAuthProvider(
+		*googleSettings,
+		[]oauth2.AuthCodeOption{oauth2.SetAuthURLParam("prompt", "select_account")},
+		true,
+		"google",
+	)
 	if err != nil {
 		log.Fatalf("Connect to Google OIDC: %v", err)
+	}
+
+	// TODO: Add new auth provider here to the map
+
+	authProviders := map[string]config.AuthProvider{
+		"google": *googleProvider,
 	}
 
 	sessionManager, err := config.NewSessionManager(db)
@@ -36,7 +48,7 @@ func main() {
 		log.Fatalf("Initialize session manager: %v", err)
 	}
 
-	authController := controllers.NewAuthController(google, sessionManager, db)
+	authController := controllers.NewAuthController(authProviders, sessionManager, db)
 	userController := controllers.NewUserController(db)
 
 	router := gin.Default()
