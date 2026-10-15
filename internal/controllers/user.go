@@ -20,6 +20,17 @@ func NewUserController(db *pgxpool.Pool) *UserController {
 	return &UserController{DB: db}
 }
 
+// Profile returns the currently authenticated user's profile.
+// @Summary Get current user profile
+// @Description Requires an authenticated browser session. Returns the current user with HTTP 202, matching the handler's existing behavior.
+// @Tags Users
+// @Produce json
+// @Security SessionAuth
+// @Success 202 {object} APIResponse[models.User] "Current user profile"
+// @Failure 401 {object} APIResponse[string] "Missing authenticated session"
+// @Failure 404 {object} APIResponse[any] "User not found; Data is an empty object in the current implementation"
+// @Failure 500 {object} APIResponse[string] "Database or other internal error"
+// @Router /api/users/profile [get]
 func (u *UserController) Profile(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
@@ -52,6 +63,16 @@ func (u *UserController) Profile(c *gin.Context) {
 	Respond(c, http.StatusAccepted, "data", user)
 }
 
+// ListUsers returns all users for an authenticated administrator.
+// @Summary List users
+// @Description Requires an authenticated session with the admin role. Returns all users ordered by creation time, newest first. The current middleware returns HTTP 401 for both missing sessions and non-admin users.
+// @Tags Users
+// @Produce json
+// @Security SessionAuth
+// @Success 200 {object} APIResponse[[]models.User] "Users ordered by creation time descending"
+// @Failure 401 {object} APIResponse[string] "Missing authenticated session or admin role"
+// @Failure 500 {object} APIResponse[string] "Database or other internal error"
+// @Router /api/admin/users/ [get]
 func (u *UserController) ListUsers(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()

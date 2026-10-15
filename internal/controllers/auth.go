@@ -41,6 +41,16 @@ func NewAuthController(
 	}
 }
 
+// Login starts a browser-based OAuth login.
+// @Summary Start provider login
+// @Description Stores state and any PKCE verifier or OIDC nonce in the server-side session, then redirects to the configured provider. Open this URL in a browser so the session cookie is retained for the callback.
+// @Tags Auth
+// @Param provider path string true "Configured provider name (currently google)"
+// @Success 302 {string} string "Redirect to the provider authorization URL; session cookie is set as needed"
+// @Failure 303 {string} string "Redirect to the frontend login error page"
+// @Header 302 {string} Location "Provider authorization URL"
+// @Header 303 {string} Location "Frontend login error URL"
+// @Router /api/auth/{provider}/login [get]
 func (a *AuthController) Login(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
@@ -93,6 +103,17 @@ func (a *AuthController) Login(c *gin.Context) {
 	redirect(c, http.StatusFound, loginURL)
 }
 
+// Callback completes the login initiated in the same browser session.
+// @Summary Handle provider callback
+// @Description Called by the OAuth provider after login. Requires the session cookie from the login request. Validates provider and state, exchanges the code, obtains an identity, and finds or creates the local user. On success, renews the session and stores user_id. For OIDC, also verifies the ID token and nonce. Errors redirect to the frontend login error page.
+// @Tags Auth
+// @Param provider path string true "Provider matching the pending login"
+// @Param state query string false "Required on a successful authorization response; must match the session state"
+// @Param code query string false "Authorization code; required unless the provider returns an error"
+// @Param error query string false "OAuth error returned when authorization fails or is denied"
+// @Success 303 {string} string "Redirect to the frontend dashboard on success, or login error page on failure"
+// @Header 303 {string} Location "Frontend dashboard or login error URL"
+// @Router /api/auth/{provider}/callback [get]
 func (a *AuthController) Callback(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
@@ -220,6 +241,14 @@ func (a *AuthController) findOrInsertUser(ctx context.Context, identity config.I
 	return userId, nil
 }
 
+// Logout destroys the current local session.
+// @Summary End the local login session
+// @Description Uses the browser session cookie to destroy the local session and redirects to the frontend home page. Does not revoke provider tokens or sign the user out of the provider. Failures redirect to the frontend login error page.
+// @Tags Auth
+// @Param provider path string true "Provider route segment; logout destroys the local session regardless of its value"
+// @Success 303 {string} string "Redirect to the frontend home page, or login error page on failure"
+// @Header 303 {string} Location "Frontend home or login error URL"
+// @Router /api/auth/{provider}/logout [get]
 func (a *AuthController) Logout(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
