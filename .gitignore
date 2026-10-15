@@ -1,0 +1,6 @@
+.env
+
+server
+
+test-frontend/dist
+test-frontend/node_modules

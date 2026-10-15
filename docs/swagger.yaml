@@ -1,0 +1,215 @@
+basePath: /
+definitions:
+  controllers.APIResponse-any:
+    properties:
+      Data: {}
+      Message:
+        type: string
+    type: object
+  controllers.APIResponse-array_models_User:
+    properties:
+      Data:
+        items:
+          $ref: '#/definitions/models.User'
+        type: array
+      Message:
+        type: string
+    type: object
+  controllers.APIResponse-models_User:
+    properties:
+      Data:
+        $ref: '#/definitions/models.User'
+      Message:
+        type: string
+    type: object
+  controllers.APIResponse-string:
+    properties:
+      Data:
+        type: string
+      Message:
+        type: string
+    type: object
+  models.User:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Authentication and user endpoints for the Nebula Platform backend.
+    Login and callback use browser redirects and a server-side session identified
+    by the nebula_session cookie.
+  title: Nebula Platform Backend API
+  version: "1.0"
+paths:
+  /api/admin/users/:
+    get:
+      description: Requires an authenticated session with the admin role. Returns
+        all users ordered by creation time, newest first. The current middleware returns
+        HTTP 401 for both missing sessions and non-admin users.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Users ordered by creation time descending
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-array_models_User'
+        "401":
+          description: Missing authenticated session or admin role
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-string'
+        "500":
+          description: Database or other internal error
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-string'
+      security:
+      - SessionAuth: []
+      summary: List users
+      tags:
+      - Users
+  /api/auth/{provider}/callback:
+    get:
+      description: Called by the OAuth provider after login. Requires the session
+        cookie from the login request. Validates provider and state, exchanges the
+        code, obtains an identity, and finds or creates the local user. On success,
+        renews the session and stores user_id. For OIDC, also verifies the ID token
+        and nonce. Errors redirect to the frontend login error page.
+      parameters:
+      - description: Provider matching the pending login
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Required on a successful authorization response; must match the
+          session state
+        in: query
+        name: state
+        type: string
+      - description: Authorization code; required unless the provider returns an error
+        in: query
+        name: code
+        type: string
+      - description: OAuth error returned when authorization fails or is denied
+        in: query
+        name: error
+        type: string
+      responses:
+        "303":
+          description: Redirect to the frontend dashboard on success, or login error
+            page on failure
+          headers:
+            Location:
+              description: Frontend dashboard or login error URL
+              type: string
+          schema:
+            type: string
+      summary: Handle provider callback
+      tags:
+      - Auth
+  /api/auth/{provider}/login:
+    get:
+      description: Stores state and any PKCE verifier or OIDC nonce in the server-side
+        session, then redirects to the configured provider. Open this URL in a browser
+        so the session cookie is retained for the callback.
+      parameters:
+      - description: Configured provider name (currently google)
+        in: path
+        name: provider
+        required: true
+        type: string
+      responses:
+        "302":
+          description: Redirect to the provider authorization URL; session cookie
+            is set as needed
+          headers:
+            Location:
+              description: Provider authorization URL
+              type: string
+          schema:
+            type: string
+        "303":
+          description: Redirect to the frontend login error page
+          headers:
+            Location:
+              description: Frontend login error URL
+              type: string
+          schema:
+            type: string
+      summary: Start provider login
+      tags:
+      - Auth
+  /api/auth/{provider}/logout:
+    get:
+      description: Uses the browser session cookie to destroy the local session and
+        redirects to the frontend home page. Does not revoke provider tokens or sign
+        the user out of the provider. Failures redirect to the frontend login error
+        page.
+      parameters:
+      - description: Provider route segment; logout destroys the local session regardless
+          of its value
+        in: path
+        name: provider
+        required: true
+        type: string
+      responses:
+        "303":
+          description: Redirect to the frontend home page, or login error page on
+            failure
+          headers:
+            Location:
+              description: Frontend home or login error URL
+              type: string
+          schema:
+            type: string
+      summary: End the local login session
+      tags:
+      - Auth
+  /api/users/profile:
+    get:
+      description: Requires an authenticated browser session. Returns the current
+        user with HTTP 202, matching the handler's existing behavior.
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Current user profile
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-models_User'
+        "401":
+          description: Missing authenticated session
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-string'
+        "404":
+          description: User not found; Data is an empty object in the current implementation
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-any'
+        "500":
+          description: Database or other internal error
+          schema:
+            $ref: '#/definitions/controllers.APIResponse-string'
+      security:
+      - SessionAuth: []
+      summary: Get current user profile
+      tags:
+      - Users
+securityDefinitions:
+  SessionAuth:
+    description: Browser-managed nebula_session cookie. Log in using the same browser.
+      Swagger 2.0 represents cookie authentication as a header; browsers send cookies
+      automatically and do not allow JavaScript to set the Cookie header manually.
+    in: header
+    name: Cookie
+    type: apiKey
+swagger: "2.0"
