@@ -4,9 +4,12 @@ Start the backend using its normal database and provider configuration, then ope
 `/swagger/index.html` on the backend (for example, `http://localhost:8081/swagger/index.html`).
 The generated specification is also served at `/swagger/doc.json`.
 
-The specification covers authentication, the current user profile, and the admin
-user list. Authentication routes are browser redirect flows: start login in a browser and let the provider return to the callback
-with the same session cookie. The callback is not a standalone login request.
+The specification covers service health, Swagger assets, authentication, the
+current user profile, and the admin user list. Operations have stable IDs, grouped
+tags, parameter constraints, response schemas, and documented session requirements.
+Authentication routes are browser redirect flows: start login in a browser and
+let the provider return to the callback with the same session cookie. The callback
+is not a standalone login request.
 
 After editing Swaggo annotations, regenerate the committed documentation from the
 repository root:
@@ -17,7 +20,9 @@ go generate .
 
 The generator is tracked as a Go tool in `go.mod`, so no separate global `swag`
 installation is required. Edit the comments in `server.go` and
-`internal/controllers/auth.go` and `internal/controllers/user.go`; `docs.go`, `swagger.json`, and `swagger.yaml` are generated.
+`internal/controllers/auth.go` and `internal/controllers/user.go`; `docs.go` and
+`swagger.yaml` are generated. The running server still exposes the embedded
+specification as JSON at `/swagger/doc.json`.
 
 Protected user routes require the `nebula_session` cookie. Complete login in the
 same browser and use Swagger UI on the backend origin so the browser sends it

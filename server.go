@@ -17,12 +17,20 @@ import (
 	"golang.org/x/oauth2"
 )
 
-//go:generate go tool swag init -g server.go --parseInternal --propertyStrategy pascalcase --exclude test-frontend -o docs
-
 // @title Nebula Platform Backend API
-// @version 1.0
-// @description Authentication and user endpoints for the Nebula Platform backend. Login and callback use browser redirects and a server-side session identified by the nebula_session cookie.
+// @version 1.0.0
+// @description Internal management API for the Nebula Platform. Authentication uses browser redirects and a server-side session identified by the nebula_session cookie.
+// @description
+// @description Start an authenticated session with `GET /api/auth/{provider}/login`, then use the protected user endpoints from the same browser. OAuth callback and logout endpoints redirect instead of returning JSON.
 // @BasePath /
+// @schemes http https
+// @produce json
+// @tag.name System
+// @tag.description Service health and API documentation endpoints.
+// @tag.name Auth
+// @tag.description Browser-based OAuth/OIDC session lifecycle.
+// @tag.name Users
+// @tag.description Current-user and administrator user operations.
 // @securityDefinitions.apikey SessionAuth
 // @in header
 // @name Cookie
@@ -100,6 +108,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Server startup failed: %v", err)
 	}
+}
+
+// HealthResponse is returned by the health endpoint.
+type HealthResponse struct {
+	Status string `json:"status" example:"ok"`
 }
 
 // Allows only certain origins since this is a specific backend server

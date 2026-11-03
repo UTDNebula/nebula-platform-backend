@@ -5,6 +5,9 @@ import "github.com/swaggo/swag"
 
 const docTemplate = `{
     "schemes": {{ marshal .Schemes }},
+    "produces": [
+        "application/json"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "{{escape .Description}}",
@@ -30,6 +33,7 @@ const docTemplate = `{
                     "Users"
                 ],
                 "summary": "List users",
+                "operationId": "listUsers",
                 "responses": {
                     "200": {
                         "description": "Users ordered by creation time descending",
@@ -54,14 +58,24 @@ const docTemplate = `{
         },
         "/api/auth/{provider}/callback": {
             "get": {
+                "security": [
+                    {
+                        "SessionAuth": []
+                    }
+                ],
                 "description": "Called by the OAuth provider after login. Requires the session cookie from the login request. Validates provider and state, exchanges the code, obtains an identity, and finds or creates the local user. On success, renews the session and stores user_id. For OIDC, also verifies the ID token and nonce. Errors redirect to the frontend login error page.",
                 "tags": [
                     "Auth"
                 ],
                 "summary": "Handle provider callback",
+                "operationId": "handleProviderCallback",
                 "parameters": [
                     {
+                        "enum": [
+                            "google"
+                        ],
                         "type": "string",
+                        "example": "google",
                         "description": "Provider matching the pending login",
                         "name": "provider",
                         "in": "path",
@@ -109,10 +123,15 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Start provider login",
+                "operationId": "startProviderLogin",
                 "parameters": [
                     {
+                        "enum": [
+                            "google"
+                        ],
                         "type": "string",
-                        "description": "Configured provider name (currently google)",
+                        "example": "google",
+                        "description": "Configured provider name",
                         "name": "provider",
                         "in": "path",
                         "required": true
@@ -148,14 +167,24 @@ const docTemplate = `{
         },
         "/api/auth/{provider}/logout": {
             "get": {
+                "security": [
+                    {
+                        "SessionAuth": []
+                    }
+                ],
                 "description": "Uses the browser session cookie to destroy the local session and redirects to the frontend home page. Does not revoke provider tokens or sign the user out of the provider. Failures redirect to the frontend login error page.",
                 "tags": [
                     "Auth"
                 ],
                 "summary": "End the local login session",
+                "operationId": "logoutProviderSession",
                 "parameters": [
                     {
+                        "enum": [
+                            "google"
+                        ],
                         "type": "string",
+                        "example": "google",
                         "description": "Provider route segment; logout destroys the local session regardless of its value",
                         "name": "provider",
                         "in": "path",
@@ -193,6 +222,7 @@ const docTemplate = `{
                     "Users"
                 ],
                 "summary": "Get current user profile",
+                "operationId": "getCurrentUserProfile",
                 "responses": {
                     "202": {
                         "description": "Current user profile",
@@ -217,6 +247,54 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/controllers.APIResponse-string"
                         }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns a successful response when the HTTP service is running.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Check service health",
+                "operationId": "getHealth",
+                "responses": {
+                    "200": {
+                        "description": "Service is healthy",
+                        "schema": {
+                            "$ref": "#/definitions/main.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/swagger/{file}": {
+            "get": {
+                "description": "Serves the interactive Swagger UI and its generated API specification.",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get Swagger UI or specification asset",
+                "operationId": "getSwaggerAsset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Swagger asset path (for example, index.html or doc.json)",
+                        "name": "file",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
                     }
                 }
             }
@@ -268,29 +346,54 @@ const docTemplate = `{
                 }
             }
         },
+        "main.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "properties": {
                 "avatar_url": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uri",
+                    "example": "https://example.com/avatar.png"
                 },
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-01-15T20:30:00Z"
                 },
                 "display_name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Nebula User"
                 },
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2f1c4db2-f1ec-45e7-9d2d-c3b16e7f1c31"
                 },
                 "role": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "user",
+                        "admin"
+                    ],
+                    "example": "user"
                 },
                 "updated_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-01-15T20:30:00Z"
                 }
             }
         }
@@ -302,17 +405,31 @@ const docTemplate = `{
             "name": "Cookie",
             "in": "header"
         }
-    }
+    },
+    "tags": [
+        {
+            "description": "Service health and API documentation endpoints.",
+            "name": "System"
+        },
+        {
+            "description": "Browser-based OAuth/OIDC session lifecycle.",
+            "name": "Auth"
+        },
+        {
+            "description": "Current-user and administrator user operations.",
+            "name": "Users"
+        }
+    ]
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "1.0.0",
 	Host:             "",
 	BasePath:         "/",
-	Schemes:          []string{},
+	Schemes:          []string{"http", "https"},
 	Title:            "Nebula Platform Backend API",
-	Description:      "Authentication and user endpoints for the Nebula Platform backend. Login and callback use browser redirects and a server-side session identified by the nebula_session cookie.",
+	Description:      "Internal management API for the Nebula Platform. Authentication uses browser redirects and a server-side session identified by the nebula_session cookie.\n\nStart an authenticated session with `GET /api/auth/{provider}/login`, then use the protected user endpoints from the same browser. OAuth callback and logout endpoints redirect instead of returning JSON.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

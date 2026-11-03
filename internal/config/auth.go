@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/UTDNebula/nebula-platform-backend/internal/models"
 	"github.com/alexedwards/scs/pgxstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -58,42 +59,32 @@ func NewGoogleSettings() (*OIDCSettings, error) {
 
 // TODO: Implement the new settings for other provider
 
-type Identity struct {
-	Provider      string
-	Issuer        string
-	Subject       string
-	Name          string
-	Picture       string
-	Email         string
-	EmailVerified bool
-}
-
 // IdentityFetcher uses an access token to fetch user information without an ID token or nonce.
-type IdentityFetcher func(ctx context.Context, token *oauth2.Token) (Identity, error)
+type IdentityFetcher func(ctx context.Context, token *oauth2.Token) (models.Identity, error)
 
 // TODO: Implement any non-OIDC identify fetcher
 
-type OIDCIdentityFetcher func(ctx context.Context, token *oauth2.Token, nonce string) (Identity, error)
+type OIDCIdentityFetcher func(ctx context.Context, token *oauth2.Token, nonce string) (models.Identity, error)
 
 // Reusable function to fetch identity from OIDC auth provider
 func fetchOIDCIdentity(provider string, verifier *oidc.IDTokenVerifier) OIDCIdentityFetcher {
-	return func(ctx context.Context, token *oauth2.Token, nonce string) (Identity, error) {
+	return func(ctx context.Context, token *oauth2.Token, nonce string) (models.Identity, error) {
 		// Fetch id token from oauth2 token
 		rawIDToken, ok := token.Extra("id_token").(string)
 		if !ok {
-			return Identity{}, fmt.Errorf("unable to access id token from oauth2 token")
+			return models.Identity{}, fmt.Errorf("unable to access id token from oauth2 token")
 		}
 		idToken, err := verifier.Verify(ctx, rawIDToken)
 		if err != nil {
-			return Identity{}, err
+			return models.Identity{}, err
 		}
 
 		// Validate the id token
 		if !TokenEqual(nonce, idToken.Nonce) {
-			return Identity{}, errors.New("invalid nonce")
+			return models.Identity{}, errors.New("invalid nonce")
 		}
 		if idToken.Subject == "" {
-			return Identity{}, errors.New("id token has no subject")
+			return models.Identity{}, errors.New("id token has no subject")
 		}
 
 		// Unmarshal claims from id token
@@ -104,15 +95,15 @@ func fetchOIDCIdentity(provider string, verifier *oidc.IDTokenVerifier) OIDCIden
 			EmailVerified bool   `json:"email_verified"`
 		}
 		if err = idToken.Claims(&claims); err != nil {
-			return Identity{}, fmt.Errorf("unable to parse claims: %w", err)
+			return models.Identity{}, fmt.Errorf("unable to parse claims: %w", err)
 		}
 
 		// Validate claims
 		if !claims.EmailVerified || strings.TrimSpace(claims.Email) == "" {
-			return Identity{}, errors.New("email is not verified or non-existent")
+			return models.Identity{}, errors.New("email is not verified or non-existent")
 		}
 
-		return Identity{
+		return models.Identity{
 			Provider:      provider,
 			Issuer:        idToken.Issuer,
 			Subject:       idToken.Subject,

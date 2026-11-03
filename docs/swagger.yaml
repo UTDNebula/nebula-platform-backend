@@ -29,36 +29,59 @@ definitions:
       Message:
         type: string
     type: object
+  main.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
   models.User:
     properties:
       avatar_url:
+        example: https://example.com/avatar.png
+        format: uri
         type: string
       created_at:
+        example: "2026-01-15T20:30:00Z"
+        format: date-time
         type: string
       display_name:
+        example: Nebula User
         type: string
       email:
+        example: user@example.com
+        format: email
         type: string
       id:
+        example: 2f1c4db2-f1ec-45e7-9d2d-c3b16e7f1c31
+        format: uuid
         type: string
       role:
+        enum:
+        - user
+        - admin
+        example: user
         type: string
       updated_at:
+        example: "2026-01-15T20:30:00Z"
+        format: date-time
         type: string
     type: object
 info:
   contact: {}
-  description: Authentication and user endpoints for the Nebula Platform backend.
-    Login and callback use browser redirects and a server-side session identified
-    by the nebula_session cookie.
+  description: |-
+    Internal management API for the Nebula Platform. Authentication uses browser redirects and a server-side session identified by the nebula_session cookie.
+
+    Start an authenticated session with `GET /api/auth/{provider}/login`, then use the protected user endpoints from the same browser. OAuth callback and logout endpoints redirect instead of returning JSON.
   title: Nebula Platform Backend API
-  version: "1.0"
+  version: 1.0.0
 paths:
   /api/admin/users/:
     get:
       description: Requires an authenticated session with the admin role. Returns
         all users ordered by creation time, newest first. The current middleware returns
         HTTP 401 for both missing sessions and non-admin users.
+      operationId: listUsers
       produces:
       - application/json
       responses:
@@ -86,8 +109,12 @@ paths:
         code, obtains an identity, and finds or creates the local user. On success,
         renews the session and stores user_id. For OIDC, also verifies the ID token
         and nonce. Errors redirect to the frontend login error page.
+      operationId: handleProviderCallback
       parameters:
       - description: Provider matching the pending login
+        enum:
+        - google
+        example: google
         in: path
         name: provider
         required: true
@@ -115,6 +142,8 @@ paths:
               type: string
           schema:
             type: string
+      security:
+      - SessionAuth: []
       summary: Handle provider callback
       tags:
       - Auth
@@ -123,8 +152,12 @@ paths:
       description: Stores state and any PKCE verifier or OIDC nonce in the server-side
         session, then redirects to the configured provider. Open this URL in a browser
         so the session cookie is retained for the callback.
+      operationId: startProviderLogin
       parameters:
-      - description: Configured provider name (currently google)
+      - description: Configured provider name
+        enum:
+        - google
+        example: google
         in: path
         name: provider
         required: true
@@ -156,9 +189,13 @@ paths:
         redirects to the frontend home page. Does not revoke provider tokens or sign
         the user out of the provider. Failures redirect to the frontend login error
         page.
+      operationId: logoutProviderSession
       parameters:
       - description: Provider route segment; logout destroys the local session regardless
           of its value
+        enum:
+        - google
+        example: google
         in: path
         name: provider
         required: true
@@ -173,6 +210,8 @@ paths:
               type: string
           schema:
             type: string
+      security:
+      - SessionAuth: []
       summary: End the local login session
       tags:
       - Auth
@@ -180,6 +219,7 @@ paths:
     get:
       description: Requires an authenticated browser session. Returns the current
         user with HTTP 202, matching the handler's existing behavior.
+      operationId: getCurrentUserProfile
       produces:
       - application/json
       responses:
@@ -204,6 +244,43 @@ paths:
       summary: Get current user profile
       tags:
       - Users
+  /health:
+    get:
+      description: Returns a successful response when the HTTP service is running.
+      operationId: getHealth
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            $ref: '#/definitions/main.HealthResponse'
+      summary: Check service health
+      tags:
+      - System
+  /swagger/{file}:
+    get:
+      description: Serves the interactive Swagger UI and its generated API specification.
+      operationId: getSwaggerAsset
+      parameters:
+      - description: Swagger asset path (for example, index.html or doc.json)
+        in: path
+        name: file
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+      summary: Get Swagger UI or specification asset
+      tags:
+      - System
+produces:
+- application/json
+schemes:
+- http
+- https
 securityDefinitions:
   SessionAuth:
     description: Browser-managed nebula_session cookie. Log in using the same browser.
@@ -213,3 +290,10 @@ securityDefinitions:
     name: Cookie
     type: apiKey
 swagger: "2.0"
+tags:
+- description: Service health and API documentation endpoints.
+  name: System
+- description: Browser-based OAuth/OIDC session lifecycle.
+  name: Auth
+- description: Current-user and administrator user operations.
+  name: Users

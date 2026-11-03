@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/UTDNebula/nebula-platform-backend/internal/config"
+	"github.com/UTDNebula/nebula-platform-backend/internal/models"
 	"github.com/alexedwards/scs/v2"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
@@ -42,10 +43,11 @@ func NewAuthController(
 }
 
 // Login starts a browser-based OAuth login.
+// @ID startProviderLogin
 // @Summary Start provider login
 // @Description Stores state and any PKCE verifier or OIDC nonce in the server-side session, then redirects to the configured provider. Open this URL in a browser so the session cookie is retained for the callback.
 // @Tags Auth
-// @Param provider path string true "Configured provider name (currently google)"
+// @Param provider path string true "Configured provider name" Enums(google) example(google)
 // @Success 302 {string} string "Redirect to the provider authorization URL; session cookie is set as needed"
 // @Failure 303 {string} string "Redirect to the frontend login error page"
 // @Header 302 {string} Location "Provider authorization URL"
@@ -104,10 +106,12 @@ func (a *AuthController) Login(c *gin.Context) {
 }
 
 // Callback completes the login initiated in the same browser session.
+// @ID handleProviderCallback
 // @Summary Handle provider callback
 // @Description Called by the OAuth provider after login. Requires the session cookie from the login request. Validates provider and state, exchanges the code, obtains an identity, and finds or creates the local user. On success, renews the session and stores user_id. For OIDC, also verifies the ID token and nonce. Errors redirect to the frontend login error page.
 // @Tags Auth
-// @Param provider path string true "Provider matching the pending login"
+// @Security SessionAuth
+// @Param provider path string true "Provider matching the pending login" Enums(google) example(google)
 // @Param state query string false "Required on a successful authorization response; must match the session state"
 // @Param code query string false "Authorization code; required unless the provider returns an error"
 // @Param error query string false "OAuth error returned when authorization fails or is denied"
@@ -170,7 +174,7 @@ func (a *AuthController) Callback(c *gin.Context) {
 	}
 
 	// Get the identify from the token
-	var identity config.Identity
+	var identity models.Identity
 	if provider.SupportOIDC {
 		nonce := a.Manager.PopString(ctx, name+"_nonce")
 		identity, err = provider.FetchOIDCIdentity(ctx, token, nonce)
@@ -201,7 +205,7 @@ func (a *AuthController) Callback(c *gin.Context) {
 
 // findOrInsertUser queries the user from database,
 // if it doesn't exist then it will create the user in the database on sign-up
-func (a *AuthController) findOrInsertUser(ctx context.Context, identity config.Identity) (uuid.UUID, error) {
+func (a *AuthController) findOrInsertUser(ctx context.Context, identity models.Identity) (uuid.UUID, error) {
 	var userId uuid.UUID
 	if err := a.DB.QueryRow(
 		ctx,
@@ -242,10 +246,12 @@ func (a *AuthController) findOrInsertUser(ctx context.Context, identity config.I
 }
 
 // Logout destroys the current local session.
+// @ID logoutProviderSession
 // @Summary End the local login session
 // @Description Uses the browser session cookie to destroy the local session and redirects to the frontend home page. Does not revoke provider tokens or sign the user out of the provider. Failures redirect to the frontend login error page.
 // @Tags Auth
-// @Param provider path string true "Provider route segment; logout destroys the local session regardless of its value"
+// @Security SessionAuth
+// @Param provider path string true "Provider route segment; logout destroys the local session regardless of its value" Enums(google) example(google)
 // @Success 303 {string} string "Redirect to the frontend home page, or login error page on failure"
 // @Header 303 {string} Location "Frontend home or login error URL"
 // @Router /api/auth/{provider}/logout [get]

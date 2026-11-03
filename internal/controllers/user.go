@@ -21,6 +21,7 @@ func NewUserController(db *pgxpool.Pool) *UserController {
 }
 
 // Profile returns the currently authenticated user's profile.
+// @ID getCurrentUserProfile
 // @Summary Get current user profile
 // @Description Requires an authenticated browser session. Returns the current user with HTTP 202, matching the handler's existing behavior.
 // @Tags Users
@@ -64,6 +65,7 @@ func (u *UserController) Profile(c *gin.Context) {
 }
 
 // ListUsers returns all users for an authenticated administrator.
+// @ID listUsers
 // @Summary List users
 // @Description Requires an authenticated session with the admin role. Returns all users ordered by creation time, newest first. The current middleware returns HTTP 401 for both missing sessions and non-admin users.
 // @Tags Users
