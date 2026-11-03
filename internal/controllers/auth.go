@@ -177,9 +177,17 @@ func (a *AuthController) Callback(c *gin.Context) {
 	var identity models.Identity
 	if provider.SupportOIDC {
 		nonce := a.Manager.PopString(ctx, name+"_nonce")
-		identity, err = provider.FetchOIDCIdentity(ctx, token, nonce)
+		if provider.FetchOIDCIdentity != nil {
+			identity, err = provider.FetchOIDCIdentity(ctx, token, nonce)
+		} else {
+			err = errors.New("FetchOIDCIdentity is not defined for OIDC provider")
+		}
 	} else {
-		identity, err = provider.FetchIdentity(ctx, token)
+		if provider.FetchIdentity != nil {
+			identity, err = provider.FetchIdentity(ctx, token)
+		} else {
+			err = errors.New("FetchIdentity is not defined for non-OIDC provider")
+		}
 	}
 	if err != nil {
 		redirectError(c, err)

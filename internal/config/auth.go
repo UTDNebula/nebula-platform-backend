@@ -128,10 +128,10 @@ type AuthProvider struct {
 	// Does this provider support PKCE verifier when exchanging authz code for oauth2 token?
 	SupportPKCE bool
 
-	// Method to get identify from oauth2 token if OIDC is not supported, null otherwise
+	// Method to get identify from oauth2 token if OIDC is not supported, nil otherwise
 	FetchIdentity IdentityFetcher
 
-	// Method to get identify from oauth2 token if OIDC is supported, null otherwise
+	// Method to get identify from oauth2 token if OIDC is supported, nil otherwise
 	FetchOIDCIdentity OIDCIdentityFetcher
 }
 

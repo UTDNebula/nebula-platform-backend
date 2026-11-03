@@ -88,26 +88,9 @@ func (u *UserController) ListUsers(c *gin.Context) {
 		RespondInternalError(c, err)
 		return
 	}
-	defer rows.Close()
 
-	users := make([]models.User, 0)
-	for rows.Next() {
-		var user models.User
-		if err := rows.Scan(
-			&user.ID,
-			&user.Email,
-			&user.DisplayName,
-			&user.AvatarURL,
-			&user.Role,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		); err != nil {
-			RespondInternalError(c, err)
-			return
-		}
-		users = append(users, user)
-	}
-	if err := rows.Err(); err != nil {
+	users, err := pgx.CollectRows(rows, pgx.RowToStructByName[models.User])
+	if err != nil {
 		RespondInternalError(c, err)
 		return
 	}
