@@ -6,9 +6,9 @@ import (
 )
 
 func RegisterAuth(router *gin.Engine, controller *controllers.AuthController) {
-	googleAuthGroup := router.Group("/api/auth")
+	authGroup := router.Group("/api/auth")
 
-	googleAuthGroup.GET("/:provider/login", controller.Login)
-	googleAuthGroup.GET("/:provider/callback", controller.Callback)
-	googleAuthGroup.GET("/:provider/logout", controller.Logout)
+	authGroup.GET("/:provider/login", controller.Login)
+	authGroup.GET("/:provider/callback", controller.Callback)
+	authGroup.GET("/:provider/logout", controller.Logout)
 }
